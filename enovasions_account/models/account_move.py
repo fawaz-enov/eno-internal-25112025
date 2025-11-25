@@ -194,7 +194,21 @@ class AccountMoveInherit(models.Model):
                 if record.system_id.pfx_status == True:
                     if record.move_type in ['out_invoice','out_refund']:
                         # Fetch values from system parameters
-                        path = record.system_id.pfx_file_path       
+                        # path = record.system_id.pfx_file_path
+
+                        # base_path = "C:/Program Files/Odoo 18.0.2025090/VSDC/"
+
+                        # cert_file = os.path.join(base_path, "certificate.pem")
+                        # key_file = os.path.join(base_path, "private_key.pem")
+
+                        # print("cert_file",cert_file)
+                        # print("key_file",key_file)
+
+                        # password = record.system_id.pfx_password
+                        # pac_value = record.system_id.pfx_pac
+                        # pfx_expiry_date = record.system_id.pfx_expiry_date
+
+                        path = record.system_id.pfx_file_path
 
                         cert_file = os.path.join(os.path.dirname(path), "certificate.pem")
                         key_file = os.path.join(os.path.dirname(path), "private_key.pem")
@@ -432,6 +446,20 @@ class AccountMoveInherit(models.Model):
                     print("record.move_type",record.move_type)
                     if record.move_type in ['out_invoice','out_refund']:
                         # Fetch values from system parameters
+                        # path = record.system_id.pfx_file_path
+
+                        # base_path = "C:/Program Files/Odoo 18.0.2025090/VSDC/"
+
+                        # cert_file = os.path.join(base_path, "certificate.pem")
+                        # key_file = os.path.join(base_path, "private_key.pem")
+
+                        # print("cert_file",cert_file)
+                        # print("key_file",key_file)
+
+                        # password = record.system_id.pfx_password
+                        # pac_value = record.system_id.pfx_pac
+                        # pfx_expiry_date = record.system_id.pfx_expiry_date
+
                         path = record.system_id.pfx_file_path
 
                         cert_file = os.path.join(os.path.dirname(path), "certificate.pem")
