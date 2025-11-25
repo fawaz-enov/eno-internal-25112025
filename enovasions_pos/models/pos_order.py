@@ -177,6 +177,76 @@ class AccountMoveInherit(models.Model):
 
             return False
 
+    def _get_related_sale_order(self, record):
+        # from invoice → SO
+        sale_orders = record.invoice_line_ids.mapped('sale_line_ids.order_id').exists()
+        so = sale_orders[:1]
+        if not so and record.invoice_origin:
+            so = record.env['sale.order'].search([('name', '=', record.invoice_origin)], limit=1)
+        return so
+
+    def ordinal(self, n):
+        return "%d%s" % (
+            n,
+            "th" if 11 <= (n % 100) <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th"),
+        )
+
+    def _get_installment_number(self, record, so):
+        self_env = record.env['account.move']
+
+        advance_invoices = so.invoice_ids.filtered(
+            lambda m: m.order_type == 'advance'
+            and m.state not in ('cancel')
+            and m.id <= record.id      # so earlier advances + this one
+        ).sorted(lambda m: (m.invoice_date or fields.Date.today(), m.id))
+
+        # position of current invoice in that list = installment number
+        idx = 0
+        for inv in advance_invoices:
+            idx += 1
+            if inv.id == record.id:
+                return idx
+        return 1
+
+    def _get_reference_for_installment(self, record, so):
+        """Return the reference document number + date for this invoice."""
+        advance_invoices = so.invoice_ids.filtered(
+            lambda m: m.order_type == 'advance' and m.state != 'cancel'
+        ).sorted(lambda m: (m.invoice_date or m.create_date, m.id))
+
+        # If this is an advance invoice
+        if record.order_type == 'advance':
+            # Find index
+            idx = 0
+            for i, inv in enumerate(advance_invoices):
+                if inv.id == record.id:
+                    idx = i
+                    break
+
+            # If first advance invoice → no reference
+            if idx == 0:
+                return "", ""
+
+            # Otherwise reference previous advance invoice
+            prev_inv = advance_invoices[idx - 1]
+            return prev_inv.name or "", (
+                prev_inv.invoice_date or prev_inv.create_date
+            ).strftime("%Y-%m-%d %H:%M:%S")
+
+        # If this is final NORMAL invoice
+        elif record.order_type == 'normal':
+            if not advance_invoices:
+                return "", ""
+
+            last_adv = advance_invoices[-1]
+            return last_adv.name or "", (
+                last_adv.invoice_date or last_adv.create_date
+            ).strftime("%Y-%m-%d %H:%M:%S")
+
+        return "", ""
+
+    
+
     def action_send_request(self):
         for record in self:
             if not record.system_id:
@@ -191,7 +261,21 @@ class AccountMoveInherit(models.Model):
             if record.system_id.pfx_status is True:
                 if record.move_type in ['out_invoice', 'out_refund']:
                     # Certificates
-                    path = record.system_id.pfx_file_path       
+                    # path = record.system_id.pfx_file_path
+
+                    # base_path = "C:/Program Files/Odoo 18.0.2025090/VSDC/"
+
+                    # cert_file = os.path.join(base_path, "certificate.pem")
+                    # key_file = os.path.join(base_path, "private_key.pem")
+
+                    # print("cert_file",cert_file)
+                    # print("key_file",key_file)
+
+                    # password = record.system_id.pfx_password
+                    # pac_value = record.system_id.pfx_pac
+                    # pfx_expiry_date = record.system_id.pfx_expiry_date
+
+                    path = record.system_id.pfx_file_path
 
                     cert_file = os.path.join(os.path.dirname(path), "certificate.pem")
                     key_file = os.path.join(os.path.dirname(path), "private_key.pem")
@@ -217,6 +301,8 @@ class AccountMoveInherit(models.Model):
                         invoiceType = "Normal"
 
                     transactionType = "Sale" if record.move_type == 'out_invoice' else "Refund"
+                    _logger.info("Transaction : %s", record.move_type)
+                    _logger.info("Record Type : %s", record.order_type)
 
                     invoice_data = {
                         'dateAndTimeOfIssue': (record.create_date.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z' if record.create_date else None),
@@ -239,25 +325,184 @@ class AccountMoveInherit(models.Model):
 
                     # Items
                     if record.order_type == "advance":
-                        sale_orders = record.invoice_line_ids.mapped('sale_line_ids.order_id').exists()
-                        so = sale_orders[:1]
-                        if not so and record.invoice_origin:
-                            so = record.env['sale.order'].search([('name', '=', record.invoice_origin)], limit=1)
+                        _logger.info("Order Type adv : %s", record.order_type)
+                        
+                        # sale_orders = record.invoice_line_ids.mapped('sale_line_ids.order_id').exists()
+                        # so = sale_orders[:1]
+                        # if not so and record.invoice_origin:
+                        #     so = record.env['sale.order'].search([('name', '=', record.invoice_origin)], limit=1)
 
+                        # if so:
+                        #     for so_line in so.order_line:
+                        #         if so_line.display_type or getattr(so_line, "is_downpayment", False):
+                        #             continue
+                        #         tax_labels = [t.invoice_label for t in so_line.tax_id]
+                        #         invoice_data["items"].append({
+                        #             "name": so_line.product_id.name,
+                        #             "quantity": so_line.product_uom_qty,
+                        #             "discount": getattr(so_line, "discount", 0.0) or 0.0,
+                        #             "unitPrice": so_line.price_unit,
+                        #             "totalAmount": so_line.price_total,
+                        #             "labels": tax_labels,
+                        #         }) 
+
+                        so = self._get_related_sale_order(record) 
                         if so:
-                            for so_line in so.order_line:
-                                if so_line.display_type or getattr(so_line, "is_downpayment", False):
-                                    continue
-                                tax_labels = [t.invoice_label for t in so_line.tax_id]
-                                invoice_data["items"].append({
-                                    "name": so_line.product_id.name,
-                                    "quantity": so_line.product_uom_qty,
-                                    "discount": getattr(so_line, "discount", 0.0) or 0.0,
-                                    "unitPrice": so_line.price_unit,
-                                    "totalAmount": so_line.price_total,
-                                    "labels": tax_labels,
-                                }) 
+
+                           # All advance invoices (in order)
+                            advance_invoices = so.invoice_ids.filtered(
+                                lambda m: m.order_type == 'advance' and m.state != 'cancel'
+                            ).sorted(lambda m: (m.invoice_date or m.create_date, m.id))
+
+                            # Find position
+                            adv_ids = advance_invoices.ids
+                            try:
+                                idx = adv_ids.index(record.id)
+                            except ValueError:
+                                idx = -1
+
+                            # Previous advance invoice
+                            previous_inv = advance_invoices[idx - 1] if idx > 0 else None
+
+                            # Read previous invoice's stored REF fields
+                            if previous_inv:
+                                ref_no = previous_inv.ref_doc_num or ''
+                                dt = previous_inv.ref_doc_date or previous_inv.invoice_date or previous_inv.create_date
+                                ref_dt = dt.strftime('%Y-%m-%d %H:%M:%S')
+                            else:
+                                ref_no = ''
+                                ref_dt = ''
+
+                            # Assign to payload
+                            invoice_data["referentDocumentNumber"] = ref_no
+                            invoice_data["referentDocumentDT"] = ref_dt
+                            # invoice_data["invoiceType"] = "Normal" 
+ 
+                            inst_no = self._get_installment_number(record, so)
+                            inst_label = self.ordinal(inst_no) 
+ 
+                            base_so_line = so.order_line.filtered(
+                                lambda l: not l.display_type and not getattr(l, "is_downpayment", False)
+                            )[:1]
+
+                            base_name = base_so_line.product_id.name if base_so_line else ""
+    
+                            # ------- Correct TAX LABEL extraction -------
+                            # if base_so_line:
+                            #     tax_labels = [t.invoice_label for t in base_so_line.tax_id]
+                            # else:
+                            #     tax_labels = []
+                            # _logger.info("tax_labels : %s", tax_labels)
+
+                            # ------- Build item -------
+                            # invoice_data["items"].append({
+                            #     "name": item_name,
+                            #     "quantity": 1,
+                            #     "discount": 0.0,
+                            #     "unitPrice": record.amount_untaxed,
+                            #     "totalAmount": record.amount_untaxed,
+                            #     "labels": tax_labels,
+                            # })
+
+                            if transactionType == 'Refund':
+
+                                _logger.info("Advance REFUND logic triggered")
+
+                                # The original advance sale this refund reverses
+                                orig = record.reversed_entry_id
+
+                                # Build advance SALE chain only (exclude refunds/copies)
+                                advances = so.invoice_ids.filtered(
+                                    lambda m:
+                                        m.move_type == 'out_invoice'
+                                        and m.state != 'cancel'
+                                        and (getattr(m, 'order_type', '') == 'advance'
+                                            or getattr(m, 'invoice_type', '') == 'advance')
+                                        and m.invoice_type != 'copy'
+                                ).sorted(lambda m: (m.invoice_date or m.create_date, m.id))
+
+                                # Determine installment number from ORIGINAL advance, not this refund
+                                try:
+                                    inst_no = advances.ids.index(orig.id) + 1 if orig else 1
+                                except ValueError:
+                                    inst_no = 1
+
+                                inst_label = self.ordinal(inst_no)
+                                item_name = f"{inst_label} Installment"
+
+                                # Refund items copy the same installment name
+                                for line in record.invoice_line_ids:
+                                    if line.product_id.is_charging is not True:
+                                        tax_labels = [t.invoice_label for t in line.tax_ids]
+                                        invoice_data["items"].append({
+                                            "name": item_name,
+                                            "quantity": line.quantity,
+                                            "discount": line.discount,
+                                            "unitPrice": line.price_unit,
+                                            "totalAmount": line.price_total,
+                                            "labels": tax_labels,
+                                        })
+
+                                # Stop here – do NOT fall into Advance Sale block
+                                _logger.info("Advance refund item payload: %s", invoice_data)
+                                # continue to payment section
+                            # ---------------------------------------------------
+                            # 2) ADVANCE SALE (existing logic – unchanged)
+                            # ---------------------------------------------------
+                            else:
+                                _logger.info("Advance SALE logic triggered")
+
+                                # === your existing advance sale code below (no change except we need item_name defined) ===
+
+                                so = self._get_related_sale_order(record)
+                                if so:
+                                    advance_invoices = so.invoice_ids.filtered(
+                                        lambda m: m.order_type == 'advance' and m.state != 'cancel'
+                                    ).sorted(lambda m: (m.invoice_date or m.create_date, m.id))
+
+                                    adv_ids = advance_invoices.ids
+                                    try:
+                                        idx = adv_ids.index(record.id)
+                                    except ValueError:
+                                        idx = -1
+
+                                    previous_inv = advance_invoices[idx - 1] if idx > 0 else None
+
+                                    if previous_inv:
+                                        ref_no = previous_inv.ref_doc_num or ''
+                                        dt = previous_inv.ref_doc_date or previous_inv.invoice_date or previous_inv.create_date
+                                        ref_dt = dt.strftime('%Y-%m-%d %H:%M:%S')
+                                    else:
+                                        ref_no = ''
+                                        ref_dt = ''
+
+                                    invoice_data["referentDocumentNumber"] = ref_no
+                                    invoice_data["referentDocumentDT"] = ref_dt
+
+                                    inst_no = self._get_installment_number(record, so)
+                                    inst_label = self.ordinal(inst_no)
+
+                                    base_so_line = so.order_line.filtered(
+                                        lambda l: not l.display_type and not getattr(l, "is_downpayment", False)
+                                    )[:1]
+
+                                    base_name = base_so_line.product_id.name if base_so_line else ""
+
+                                    item_name = f"{inst_label} Installment"
+
+                                    for line in record.invoice_line_ids:
+                                        if line.product_id.is_charging is not True:
+                                            tax_labels = [t.invoice_label for t in line.tax_ids]
+                                            invoice_data["items"].append({
+                                                "name": item_name,
+                                                "quantity": line.quantity,
+                                                "discount": line.discount,
+                                                "unitPrice": line.price_unit,
+                                                "totalAmount": line.price_total,
+                                                "labels": tax_labels,
+                                            })
                     else:
+                        _logger.info("Order Type not adv : %s", record.order_type)
                         for line in record.invoice_line_ids:
                             if line.product_id.is_charging is not True:
                                 tax_labels = []
@@ -415,7 +660,19 @@ class AccountMoveInherit(models.Model):
 
                 if record.move_type in ['out_invoice', 'out_refund']:
 
-                    path = record.system_id.pfx_file_path       
+                    # path = record.system_id.pfx_file_path
+                    # base_path = "C:/Program Files/Odoo 18.0.2025090/VSDC/"
+                    # cert_file = os.path.join(base_path, "certificate.pem")
+                    # key_file = os.path.join(base_path, "private_key.pem")
+
+                    # print("cert_file",cert_file)
+                    # print("key_file",key_file)
+
+                    # password = record.system_id.pfx_password
+                    # pac_value = record.system_id.pfx_pac
+                    # pfx_expiry_date = record.system_id.pfx_expiry_date
+
+                    path = record.system_id.pfx_file_path
 
                     cert_file = os.path.join(os.path.dirname(path), "certificate.pem")
                     key_file = os.path.join(os.path.dirname(path), "private_key.pem")
@@ -450,19 +707,71 @@ class AccountMoveInherit(models.Model):
                     }
 
                     # Items
+                    # if record.order_type == "advance":
+                    #     sale_orders = record.invoice_line_ids.mapped('sale_line_ids.order_id').exists()
+                    #     so = sale_orders[:1]
+                    #     if not so and record.invoice_origin:
+                    #         so = record.env['sale.order'].search([('name', '=', record.invoice_origin)], limit=1)
+
+                    #     if so:
+                    #         for so_line in so.order_line:
+                    #             if so_line.display_type or getattr(so_line, "is_downpayment", False):
+                    #                 continue
+                    #             tax_labels = [t.invoice_label for t in so_line.tax_id]
+                    #             invoice_data["items"].append({
+                    #                 "name": so_line.product_id.name,
+                    #                 "quantity": so_line.product_uom_qty,
+                    #                 "discount": getattr(so_line, "discount", 0.0) or 0.0,
+                    #                 "unitPrice": so_line.price_unit,
+                    #                 "totalAmount": so_line.price_total,
+                    #                 "labels": tax_labels,
+                    #             })
+                    # else:
+                    # for line in record.invoice_line_ids:
+                    #         if line.product_id.is_charging is not True:
+                    #             tax_labels = []
+                    #             for tax in line.tax_ids:
+                    #                 tax_labels.append(tax.invoice_label)
+                    #             item_name = line.product_id.name or line.name or "Item"
+                    #             invoice_data["items"].append({
+                    #                 "name": item_name,
+                    #                 "quantity": line.quantity,
+                    #                 "discount": line.discount,
+                    #                 "unitPrice": line.price_unit,
+                    #                 "totalAmount": line.price_total,
+                    #                 "labels": tax_labels
+                    #             })    
+
+                    # ================================
+                    # Copy Refund Line Logic (Advance-Aware)
+                    # ================================
+
+                    so = self._get_related_sale_order(record)
+
+                    # Detect if the original document was an advance installment
+                    inst_name = None
+                    if so and record.reversed_entry_id and record.reversed_entry_id.order_type == "advance":
+                        # Get the original installment number using your helper
+                        inst_no = self._get_installment_number(record.reversed_entry_id, so)
+                        inst_label = self.ordinal(inst_no)
+                        inst_name = f"{inst_label} Installment"
+
                     for line in record.invoice_line_ids:
                         if line.product_id.is_charging is not True:
-                            tax_labels = []
-                            for tax in line.tax_ids:
-                                tax_labels.append(tax.invoice_label)
+                            tax_labels = [t.invoice_label for t in line.tax_ids]
+
+                            # Use original installment name if available
+                            item_name = inst_name or line.product_id.name or line.name or "Item"
+
                             invoice_data["items"].append({
-                                "name": line.product_id.name,
+                                "name": item_name,
                                 "quantity": line.quantity,
                                 "discount": line.discount,
                                 "unitPrice": line.price_unit,
                                 "totalAmount": line.price_total,
                                 "labels": tax_labels
                             })
+
 
                     # POS payments for copy if POS-origin
                     if record.pos_order_ids:
@@ -497,6 +806,8 @@ class AccountMoveInherit(models.Model):
                                 "paymentType": 0
                             })
 
+                    _logger.info("Refund lines belong to invoice: %s", invoice_data)
+                    
                     url = "https://vsdc.sandbox.vms.frcs.org.fj/api/v3/invoices"
                     context = ssl.create_default_context()
                     context.load_cert_chain(certfile=cert_file, keyfile=key_file, password=password)
