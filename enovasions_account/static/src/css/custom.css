@@ -1,0 +1,5 @@
+/* Hide “Send Request” on Vendor Bills (in_invoice) and Vendor Credit Notes (in_refund) */
+.o_account_move_form_view .o_form_renderer:has([name="move_type"] span[raw-value="in_invoice"]) .send_request_btn,
+.o_account_move_form_view .o_form_renderer:has([name="move_type"] span[raw-value="in_refund"]) .send_request_btn {
+  display: none !important;
+}

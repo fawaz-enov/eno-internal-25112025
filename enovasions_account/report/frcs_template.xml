@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="report_frcs_invoice_template">
+        <t t-call="web.external_layout">
+            <main style="padding-top:0px;">
+                <!-- Parse the JSON Data -->
+                <t t-set="data" t-value="docs.post_response_json or {}"/>
+
+                <div style="position: absolute; right: 30px; top: 10px; text-align: right; font-weight: bold;">
+                    <h4 style="text-transform: uppercase; font-weight: 600;">TAX INVOICE</h4>
+                </div>
+                <br/>
+
+                <!-- Left: Customer Details -->
+                <table class="table table-borderless" style="width:100%; font-size: 12px; border-collapse: collapse; margin-bottom: 10px;">
+                    <tr>
+                        <td style="padding: 2px; width: 15%;"><strong>Customer Name:</strong></td>
+                        <td style="padding: 2px;">
+                            <t t-esc="docs.partner_id.name or ''"/><br/>
+                            <t t-esc="docs.partner_id.street or ''"/>
+                            <t t-if="docs.partner_id.street2">, <t t-esc="docs.partner_id.street2"/></t>
+                            <t t-if="docs.partner_id.city">, <t t-esc="docs.partner_id.city"/></t>
+                            <t t-if="docs.partner_id.state_id">, <t t-esc="docs.partner_id.state_id.name"/></t>
+                            <t t-if="docs.partner_id.zip">, <t t-esc="docs.partner_id.zip"/></t>
+                            <t t-if="docs.partner_id.country_id">, <t t-esc="docs.partner_id.country_id.name"/></t>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>Due Date:</strong></td>
+                        <td style="padding: 2px; ">
+                            <t t-if="docs.invoice_date_due">
+                                <t t-raw="docs.invoice_date_due.strftime('%d-%b-%Y')"/>
+                            </t>
+                            <t t-if="not docs.invoice_date_due">-</t>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>Document Date:</strong></td>
+                        <td style="padding: 2px; ">
+                            <t t-if="docs.invoice_date">
+                                <t t-raw="docs.invoice_date.strftime('%d-%b-%Y')"/>
+                            </t>
+                            <t t-if="not docs.invoice_date">-</t>
+                        </td>
+
+                    </tr>
+                </table>
+
+                <!-- Invoice Header -->
+                <t t-if="data.get('invoiceCounterExtension') in ['NS', 'NR', 'AS', 'AR']">
+                    <p class="text-center" style="font-weight: bold;">
+                        ====================================== FISCAL INVOICE ======================================
+                    </p>
+                </t>
+
+                <!-- Left: Customer Details -->
+                <table class="table table-borderless" style="width:100%; font-size: 12px; border-collapse: collapse; margin-bottom: 10px;">
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>TIN:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="data.get('tin', '')"/></td>
+                        <td style="padding: 2px; width: 20%;"><strong>Company:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="data.get('businessName', '')"/></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>Store:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="data.get('businessName', '')"/></td>
+                        <td style="padding: 2px; width: 20%;"><strong>Address:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="data.get('address', '')"/></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>Cashier:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="docs.user_id.name or ''"/></td>
+                        <td style="padding: 2px; width: 20%;"><strong>Cashier TIN:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="docs.user_id.partner_id.vat or ''"/></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>District:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="data.get('district', '')"/></td>
+                        <td style="padding: 2px; width: 20%;"><strong>Buyer ID:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="docs.partner_id.id or ''"/></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>POS Number:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="docs.name or ''"/></td>
+                        <td style="padding: 2px; width: 20%;"><strong>POS Time:</strong></td>
+                        <td style="padding: 2px; width: 30%;">
+                            <t t-set="j" t-value="data.get('journal') or ''"/>
+                                 <!-- ===== POS Time: to 'YYYY-MM-DD hh:mm:ss AM/PM' ===== -->
+                                 <t t-set="ps" t-value="j.find('POS Time:')"/>
+                                 <t t-set="pos_line" t-value="ps != -1 and j[ps + 9:].splitlines()[0].strip() or ''"/>
+                                 <t t-if="pos_line">
+                                     <t t-set="pp"  t-value="pos_line.split()"/>               <!-- ['28/09/2025','5:06:36','PM'] -->
+                                     <t t-set="dmy" t-value="pp[0].split('/')"/>               <!-- ['28','09','2025'] -->
+                                     <t t-set="hm" t-value="pp[1].split(':')"/>               <!-- ['5','06','36'] -->
+                                     <t t-set="ampm" t-value="pp[-1]"/>                        <!-- 'PM' -->
+                                     <t t-esc="'%s-%02d-%02d %02d:%02d %s' % (dmy[2], int(dmy[1]), int(dmy[0]), (int(hm[0]) % 12 or 12), int(hm[1]), ampm)"/>
+                                 </t>
+                        </td>
+                    </tr>
+                    <t t-if="data.get('invoiceCounterExtension') in ['NR', 'AR', 'TR']">
+                        <tr>
+                             <td style="padding: 2px; width: 20%;"><strong>Ref No:</strong></td>
+                             <td style="padding: 2px;"><t t-esc="docs.move_type == 'out_invoice' and docs.ref_doc_num or docs.move_type == 'out_refund' and docs.origin_doc_num or ''"/></td>
+                             <td style="padding: 2px; width: 20%;"><strong>Ref DT:</strong></td>
+                             <td style="padding: 2px; width: 30%;">
+                                 <t t-set="mvtype" t-value="docs.move_type or ''"/>
+                                 <t t-set="base_dt" t-value="(mvtype == 'out_invoice' and docs.ref_doc_date) or (mvtype == 'out_refund'  and docs.origin_doc_date) or False"/>
+                                 <!-- If present, format to 'YYYY-MM-DD hh:mm:ss AM/PM' in user tz -->
+                                 <t t-if="base_dt">
+                                    <t t-esc="(base_dt and base_dt.strftime('%Y-%m-%d %I:%M %p').upper()) or ''"/>
+                                 </t>
+                             </td>
+                        </tr>
+                    </t>
+                </table>
+
+                <div style="text-align: right; font-weight: 600;">
+                    <t t-if="data.get('invoiceCounterExtension') == 'NS'">
+                        <h4 style="font-weight: 500;">Normal Sale</h4>
+                    </t>
+                    <t t-if="data.get('invoiceCounterExtension') == 'NR'">
+                        <h4 style="font-weight: 500;">Normal Refund</h4>
+                    </t>
+                    <t t-if="data.get('invoiceCounterExtension') == 'AS'">
+                        <h4 style="font-weight: 500;">Advance Sale</h4>
+                    </t>
+                    <t t-if="data.get('invoiceCounterExtension') == 'AR'">
+                        <h4 style="font-weight: 500;">Advance Refund</h4>
+                    </t>
+                    <t t-if="data.get('invoiceCounterExtension') == 'TS'">
+                        <h4 style="font-weight: 500;">Training Sale</h4>
+                    </t>
+                    <t t-if="data.get('invoiceCounterExtension') == 'TR'">
+                        <h4 style="font-weight: 500;">Training Refund</h4>
+                    </t>
+                </div>
+                <div style="text-align:left; font-weight:normal;">Items</div>
+                <!-- Invoice Lines  -->
+                <table style="width:100%; border-collapse:collapse; collapse; border-spacing: 1px;border-spacing: 1px;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid black;font-size: 14px">
+                            <th style="text-align: left;font-weight: bold;padding: 2px; border:1px solid #000 !important;">Name</th>
+                            <th style="text-align: center;font-weight: bold;padding: 2px; border:1px solid #000 !important;">Qty</th>
+                            <th style="text-align: center;font-weight: bold;padding: 2px; border:1px solid #000 !important;">Price</th>
+                            <th style="text-align: right;font-weight: bold;padding: 2px; border:1px solid #000 !important;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody style="font-size: 12px;">
+                            <t t-if="data.get('invoiceCounterExtension') in ('AS', 'AR')">
+                              <t t-set="sale_orders" t-value="docs.invoice_line_ids.mapped('sale_line_ids.order_id').exists()"/>
+                              <t t-set="so" t-value="(sale_orders and sale_orders[0]) or (docs.invoice_origin and env['sale.order'].search([('name', '=', docs.invoice_origin)], limit=1))"/>
+                              <t t-if="so">
+                                <t t-foreach="so.order_line" t-as="so_line">
+                                  <t t-if="not so_line.display_type and ( 'is_downpayment' not in so_line._fields or not so_line.is_downpayment )">
+                                    <tr>
+                                      <td style="padding:2px; border:1px solid #000 !important;">
+                                        <t t-esc="(so_line.product_id and so_line.product_id.display_name) or so_line.name"/> (<t t-esc="', '.join([t.invoice_label or t.name for t in so_line.tax_id])"/>)
+                                      </td>
+                                      <td style="text-align:center; padding:2px; border:1px solid #000 !important;">
+                                        <t t-esc="so_line.product_uom_qty"/>
+                                      </td>
+                                      <td style="text-align:center; padding:2px; border:1px solid #000 !important;">
+                                        <t t-if="data.get('invoiceCounterExtension') in ['NR', 'AR', 'TR']">- </t><t t-esc="so_line.price_unit"/>
+                                      </td>
+                                      <td style="text-align:right; padding:2px; border:1px solid #000 !important;">
+                                        <t t-esc="'{:.2f}'.format(so_line.price_total or 0.0)"/>
+                                      </td>
+                                    </tr>
+                                  </t>
+                                </t>
+                              </t>
+                            </t>
+                            <t t-else="">
+                            <t t-set="counter" t-value="1"/>
+                                <t t-foreach="docs.invoice_line_ids" t-as="line">
+                                    <tr>
+                                        <td style="padding: 2px; border:1px solid #000 !important;"><t t-esc="line.product_id.name"/> (<t t-esc="line.tax_ids and ', '.join([str(t.invoice_label) for t in line.tax_ids]) or ''"/>)</td>
+                                        <td style="text-align: center;padding: 2px; border:1px solid #000 !important;">
+                                            <t t-esc="'{} {}'.format(int(line.quantity or 0), line.product_uom_id.name or '')"/>
+                                        </td>
+                                        <td  style="text-align: center;padding: 2px; border:1px solid #000 !important;">
+                                            <t t-esc="line.price_unit"/>
+                                        </td>
+                                        <td style="text-align: right;padding: 2px; border:1px solid #000 !important;">
+                                            <t t-esc="'{:.2f}'.format(line.price_total or 0.0)"/>
+                                        </td>
+                                    </tr>
+                                    <t t-set="counter" t-value="counter + 1"/>
+                                </t>
+                            </t>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" style="text-align: right; font-weight: bold;font-size: 13px;padding: 2px; border:1px solid #000 !important;">
+                                <t t-if="data.get('invoiceCounterExtension') in ['NS', 'AS', 'TS']">Total Purchase</t>
+                                <t t-if="data.get('invoiceCounterExtension') in ['NR', 'AR', 'TR']">Total Refund</t>
+                            </td>
+                            <td style="text-align: right; font-weight: bold; border:1px solid #000 !important; font-size: 12px;padding: 2px;">
+                                <t t-esc="'{:.2f}'.format(docs.amount_total or 0.0)"/>
+                            </td>
+                        </tr>
+                        <t t-foreach="docs.matched_payment_ids" t-as="payment">
+                            <tr>
+                                <td colspan="3" style="text-align: right; font-weight: bold;font-size: 13px;padding: 2px; border:1px solid #000 !important;">
+                                    <t t-esc="(payment.journal_id.name or '').capitalize()"/>
+                                </td>
+                                <td colspan="3" style="text-align: right; font-weight: bold;font-size: 13px!important;padding: 2px; border:1px solid #000 !important;">
+                                    <t t-esc="'{:.2f}'.format(payment.amount or 0.0)"/>
+                                </td>
+                            </tr>
+                        </t>
+                    </tfoot>
+                </table>
+                <t t-if="data.get('invoiceCounterExtension') in ['TS', 'TR']">
+                    <p class="text-center" style="font-weight: bold;">
+                        ============================== THIS IS NOT A FISCAL INVOICE ================================
+                    </p>
+                </t>
+                <div  style="width: 100%; margin-top: 10px;">
+                    <!-- Left: Tax Information -->
+                    <div style="float: left; width: 49%;"> 
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid black; font-size: 12px; border-spacing: 1px;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid black;">
+                                    <th style="text-align: left; padding: 2px; border:1px solid #000 !important;">Label</th>
+                                    <th style="text-align: left; padding: 2px; border:1px solid #000 !important;">Name</th>
+                                    <th style="text-align: right; padding: 2px; border:1px solid #000 !important;">Rate</th>
+                                    <th style="text-align: right; padding: 2px; border:1px solid #000 !important;">Tax</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="total_tax" t-value="0"/>
+                                <t t-foreach="data.get('taxItems', [])" t-as="tax">
+                                    <tr>
+                                        <td style="padding: 2px; border:1px solid #000 !important;"><t t-esc="tax.get('label', '')"/></td>
+                                        <td style="padding: 2px; border:1px solid #000 !important;"><t t-esc="tax.get('categoryName', '')"/></td>
+                                        <td style="padding: 2px; border:1px solid #000 !important; text-align: right;">
+                                            <t t-esc="tax.get('rate', '0.00')"/>%
+                                        </td>
+                                        <td style="padding: 2px; border:1px solid #000 !important; text-align: right;">
+                                            <t t-esc="'{:.2f}'.format(tax.get('amount', '0'))"/>
+                                        </td>
+                                    </tr>
+                                    <t t-set="total_tax" t-value="total_tax + tax.get('amount', 0)"/>
+                                </t>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" style="padding: 2px; border:1px solid #000 !important;">Total Tax </td>
+                                    <td style="padding: 2px; border:1px solid #000 !important; text-align: right;">
+                                        <t t-esc="'{:.2f}'.format(total_tax or 0.0)"/>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between" style="display: flex; width: 100%;padding-top: 10px;page-break-inside: avoid;">
+                    <div style="width: 40%;">
+                        <t t-if="docs.qr_code">
+                            <img t-att-src="'data:image/png;base64,%s' % (docs.qr_code.decode('utf-8'))" style="width: 200px; height: 200px;"/>
+                        </t>
+                    </div>
+                    <div style="width: 60%;">
+                        <table class="table table-borderless" style="border-spacing: 0px;font-size: 13px;border-spacing: 1px;">
+                            <tr>
+                                <td><strong>SDC Time:</strong></td>
+                                <td>
+                                    <t t-set="s" t-value="data.get('sdcDateTime') or ''"/>
+                                    <t t-if="s">
+                                        <t t-set="h" t-value="int(s[11:13])"/>
+                                        <t t-set="ampm" t-value="h >= 12 and 'PM' or 'AM'"/>
+                                        <t t-set="h12" t-value="(h % 12) or 12"/>
+                                        <t t-esc="s[0:10] + ' ' + ('%02d' % h12) + s[13:16] + ':' + s[17:19] + ' ' + ampm"/>
+                                    </t>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>SDC Invoice No:</strong></td>
+                                <td><t t-esc="data.get('invoiceNumber', '')"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Invoice Counter:</strong></td>
+                                <td><t t-esc="data.get('invoiceCounter', '')"/></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                <br/>
+                <!-- clear floats, no forced new page -->
+                <div style="clear: both; text-align: center; width: 100%;">
+                  <span style="display:inline-block; white-space:nowrap; font-weight:bold; word-break:keep-all;">
+                      <t t-if="data.get('invoiceCounterExtension') in ['NS', 'NR', 'AS', 'AR']">
+                        ==================================== END OF FISCAL INVOICE ====================================
+                      </t>
+                      <t t-if="data.get('invoiceCounterExtension') in ['TS', 'TR']">
+                        ================================ THIS IS NOT A FISCAL RECEIPT =================================
+                      </t>
+                  </span>
+                </div>
+            </main>
+        </t>
+    </template>
+
+    <record id="action_print_frcs_report" model="ir.actions.report">
+        <field name="name">FRCS Report</field>
+        <field name="model">account.move</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">enovasions_account.report_frcs_invoice_template</field>
+        <field name="report_file">enovasions_account.report_frcs_invoice_template</field>
+        <field name="print_report_name">(object.name)</field>
+        <field name="attachment"/>
+    </record>
+
+</odoo>

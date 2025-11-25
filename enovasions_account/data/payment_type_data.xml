@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="vms0" model="vms.payment.type">
+            <field name="payment_type">0</field>
+            <field name="active">1</field>
+        </record>
+        <record id="vms1" model="vms.payment.type">
+            <field name="payment_type">1</field>
+            <field name="active">1</field>
+        </record>
+        <record id="vms2" model="vms.payment.type">
+            <field name="payment_type">2</field>
+            <field name="active">1</field>
+        </record>
+        <record id="vms3" model="vms.payment.type">
+            <field name="payment_type">3</field>
+            <field name="active">1</field>
+        </record>
+        <record id="vms4" model="vms.payment.type">
+            <field name="payment_type">4</field>
+            <field name="active">1</field>
+        </record>
+        <record id="vms5" model="vms.payment.type">
+            <field name="payment_type">5</field>
+            <field name="active">1</field>
+        </record>
+        <record id="vms6" model="vms.payment.type">
+            <field name="payment_type">6</field>
+            <field name="active">1</field>
+        </record>
+    </data>
+</odoo>

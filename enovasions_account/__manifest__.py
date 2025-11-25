@@ -1,0 +1,35 @@
+{
+    'name': 'VAT Accounting Integration',
+    'category': 'Accounting/Localizations/EDI',
+    'version': '1.0',
+    'depends': ['account', 'accountant', 'enovasions_vms_integration'],
+    'summary': 'VAT Accouting Customisation',
+    'data': [
+        'security/ir.model.access.csv',
+        'data/ir_cron.xml',
+        'data/payment_type_data.xml',
+        # 'data/tax_demo_data.xml', 
+        'report/frcs_template.xml',
+        'report/copy_report_template.xml',
+        'views/res_partner_view.xml',
+        'views/product_template.xml',
+        'views/product_tax_timeline.xml',
+        'views/account_move_views.xml',
+        'views/account_journal_views.xml',
+        'views/account_payment_view.xml',
+        'report/report_frcs_invoice.xml',
+        'data/paperformat.xml',
+        'report/report_frcs_invoice_thermal.xml',
+    ],
+    'assets': {
+        'web.assets_backend': [
+            'enovasions_account/static/src/css/custom.css',
+        ],
+    },
+    'author': 'Enovasions Limited',
+    'website':'https://enovasions.com',
+    'icon': '/enovasions_account/static/description/icon.png',
+    'auto_install': True,
+    'license': 'OEEL-1',
+}
+

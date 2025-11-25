@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="utf-8"?>   
+  <odoo>  
+
+   <record id="action_proforma_orders" model="ir.actions.act_window">
+        <field name="name">Proforma Orders</field>
+        <field name="res_model">sale.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('order_type', '=', 'proforma')]</field>
+        <field name="context">{'default_is_proforma': True,'default_order_type': 'proforma'}</field>
+    </record>
+
+    <!-- Action for Training Orders -->
+    <record id="action_training_orders" model="ir.actions.act_window">
+        <field name="name">Training Orders</field>
+        <field name="res_model">sale.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('order_type', '=', 'training')]</field>
+        <field name="context">{'default_order_type': 'training'}</field>
+    </record>
+
+   
+
+    <!-- Action for Advance Orders -->
+    <record id="action_advance_orders" model="ir.actions.act_window">
+        <field name="name">Advance Orders</field>
+        <field name="res_model">sale.order</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('order_type', '=', 'advance')]</field>
+        <field name="context">{'default_order_type': 'advance'}</field>
+    </record>
+    
+    <!-- Domain for  Quotations -->
+    <record id="sale.action_quotations_with_onboarding" model="ir.actions.act_window">
+        <field name="domain">[('order_type', '=', 'quotation')]</field>
+    </record>
+    
+    <!-- Menu for Proforma Orders -->
+    <menuitem id="menu_proforma_orders_acc"
+              name="Proforma"
+              parent="account.menu_finance_receivables"
+              action="action_proforma_orders"
+              sequence="1"/> 
+
+    <menuitem id="menu_proforma_orders_so"
+              name="Proforma"
+              parent="sale.sale_order_menu"
+              action="action_proforma_orders"
+              sequence="11"/> 
+
+    <!-- Menu for Advance Orders -->
+    <menuitem id="menu_advance_orders"
+              name="Advance Orders"
+              parent="sale.sale_order_menu"
+              action="action_advance_orders"
+              sequence="12"/>
+
+    <!-- Menu for Training Orders -->
+   <!--  <menuitem id="menu_training_orders"
+              name="Training Orders"
+              parent="sale.sale_order_menu"
+              action="action_training_orders"
+              sequence="13"/>  -->  
+
+   <record id="view_sale_order_form_inherit" model="ir.ui.view">
+        <field name="name">sale.order.form.inherit.api.button</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <field name="locked" position="after">
+                <field name="is_advance" invisible="1"/>
+            </field>
+            <xpath expr="//button[@id='create_invoice']" position="replace">
+                <button id="create_invoice" name="%(sale.action_view_sale_advance_payment_inv)d" string="Create Invoice"
+                    type="action" class="btn-primary" context="{'default_is_advance': is_advance}" data-hotkey="q"
+                    invisible="invoice_status != 'to invoice'" />
+            </xpath>
+            <xpath expr="//button[@id='create_invoice_percentage']" position="replace">
+                <button id="create_invoice_percentage" name="%(sale.action_view_sale_advance_payment_inv)d" string="Create Invoice"
+                    type="action" context="{'default_advance_payment_method': 'percentage', 'default_is_advance': is_advance}" data-hotkey="q"
+                    invisible="invoice_status != 'no' or state != 'sale'"/>
+            </xpath>
+
+            <xpath expr="//header" position="inside">
+                <button name="action_proforma_sale_request" string="Send Proforma" class="oe_highlight" type="object" 
+                        invisible="not is_button_visible" />
+               <button name="action_proforma_refund_request" string="Cancel Proforma" class="oe_highlight" type="object" 
+                        invisible="is_refund == True"/> 
+                <button name="%(action_print_ps_report)d" string="Print Proforma Sales" type="action" 
+                    invisible="not so_is_post_sale_status"/> 
+                <button name="%(action_print_pr_report)d" string="Print Proforma Refund" type="action" 
+                    invisible="not so_is_post_refund_status"/>         
+            </xpath>
+
+            <xpath expr="//field[@name='partner_shipping_id']" position="after">
+                <field name="is_proforma" invisible="1" />
+                <field name="so_is_post_sale_status" invisible="1"/>
+                <field name="is_proforma_sale" invisible="1" /> 
+                <field name="is_proforma_refund" invisible="1" /> 
+                <field name="is_refund" invisible="1"/>                 
+                <field name="ref_doc_num" readonly="1"   invisible="order_type not in ['training', 'proforma']"/>
+                <field name="ref_doc_date" readonly="1"  invisible="order_type not in ['training', 'proforma']"/>
+                <field name="is_button_visible" invisible="1" />             
+            </xpath>
+            <xpath expr="//field[@name='payment_term_id']" position="attributes">
+                    <attribute name="required">1</attribute>
+            </xpath>
+
+            <xpath expr="//field[@name='payment_term_id']" position="after">
+                <field name="so_system_id" readonly="state != 'draft'" required="1"  
+                    options="{'no_create': True, 'no_open': True}"/>
+                <field name="order_type" readonly="1"/>
+                <field name="so_buyer_cost_centerid" readonly="state != 'draft'"  />  
+                <field name="origin_doc_num" readonly="1" invisible="not so_is_post_refund_status"/>
+                <field name="origin_doc_date" readonly="1"  invisible="not so_is_post_refund_status"/>                    
+            </xpath>
+            <xpath expr="//page[@name='other_information']" position="after">
+                    <page string="Post Response" invisible="not so_is_post_sale_status">
+                        <group>
+                            <field name="so_post_response"/>
+                        </group>
+                    </page>
+                 <!--    <page string="Post Response json" invisible="not so_is_post_sale_status">
+                        <group>
+                            <field name="so_post_response_json"/>
+                        </group>
+                    </page> -->
+                   
+                    <page string="QR Code" invisible="not so_is_post_sale_status">
+                        <group>
+                                 <field name="so_qr_code" widget="image" invisible="not so_is_post_sale_status" />
+                            
+                        </group>
+                    </page>
+
+                    <page string="Refund Response" invisible="not so_is_post_refund_status">
+                        <group>
+                            <field name="so_refund_response"/>
+                        </group>
+                    </page>
+                   
+                    <page string="Refund QR Code" invisible="not so_is_post_refund_status">
+                        <group>
+                            <field name="so_refund_qr_code" widget="image" invisible="not so_is_post_refund_status" />                        
+                        </group>
+                    </page>
+                </xpath> 
+                 <!-- Update Confirm button for state == 'sent' -->
+                <xpath expr="//button[@name='action_confirm' and @id='action_confirm']" position="attributes">
+                    <attribute name="invisible">state != 'sent' or order_type in ['training', 'proforma']</attribute>
+                </xpath>
+
+                <!-- Update Confirm button for state == 'draft' -->
+                <xpath expr="//button[@name='action_confirm' and not(@id)]" position="attributes">
+                    <attribute name="invisible">state != 'draft' or order_type in ['training', 'proforma']</attribute>
+                </xpath> 
+                <xpath expr="//button[@name='action_cancel']" position="attributes">
+                    <attribute name="invisible">state not in ['draft', 'sent', 'sale'] or not id or locked or is_proforma</attribute>
+                </xpath> 
+                <xpath expr="//button[@id='send_by_email_primary']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath> 
+                <xpath expr="//button[@id='send_proforma_primary']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//button[@id='send_proforma']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath> 
+                <xpath expr="//button[@id='send_by_email']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath>
+                <xpath expr="//button[@name='action_preview_sale_order']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+                </xpath> 
+                <xpath expr="//page[@name='order_lines']//field[@name='order_line']/list//field[@name='tax_id']" position="attributes">
+                    <attribute name="required">1</attribute>
+                </xpath>
+                
+                
+            </field>
+    </record>
+
+    <record id="view_sale_advance_payment_inv_inherit" model="ir.ui.view">
+        <field name="name">>view.sale.advance.payment.inv.inherit</field>
+        <field name="model">sale.advance.payment.inv</field>
+        <field name="inherit_id" ref="sale.view_sale_advance_payment_inv"/>
+        <field name="arch" type="xml">
+            <field name="advance_payment_method" position="before">
+                <field name="is_advance" invisible="1"/>
+            </field>
+        </field>
+    </record>
+ 
+<record id="view_order_filter_inherit_proforma" model="ir.ui.view">
+    <field name="name">sale.order.filter.proforma</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_sales_order_filter"/>
+    <field name="arch" type="xml">
+
+      <!-- Add your custom filters at the end of the search view -->
+      <xpath expr="//search" position="inside">
+        <separator/>
+        <filter string="Proforma Sale" name="is_proforma_sale" domain="[('is_proforma_sale', '=', True)]"/>
+        <filter string="Proforma Return" name="is_proforma_refund" domain="[('is_proforma_refund', '=', True)]"/>
+        <!-- <filter string="Proforma Orders" domain="[('order_type', '=', 'proforma')]"/>
+        <filter string="Advance Orders" domain="[('order_type', '=', 'advance')]"/>
+        <filter string="Training Orders" domain="[('order_type', '=', 'training')]"/>
+        <filter string="Quotation" domain="[('order_type', '=', 'quotation')]"/>-->
+        <separator/>  
+        
+        <group expand="0" string="Group By">
+          <filter string="Proforma" name="group_is_proforma" context="{'group_by': 'is_proforma'}"/>
+          <filter string="Proforma Sale" name="group_is_proforma_sale" context="{'group_by': 'is_proforma_sale'}"/>
+          <filter string="Proforma Return" name="group_is_proforma_refund" context="{'group_by': 'is_proforma_refund'}"/>
+          <filter string="Order Type" name="order_type" context="{'group_by': 'order_type'}"/>
+        </group>
+      </xpath>
+
+    </field>
+  </record>
+
+<!-- <record id="sale.action_report_saleorder_raw" model="ir.actions.report">
+    <field name="binding_model_id" eval="False"/>
+</record> -->
+
+   
+<record id="sale.action_report_saleorder" model="ir.actions.report">
+    <field name="binding_model_id" eval="False"/>
+</record>
+
+    
+<record id="sale.action_report_pro_forma_invoice" model="ir.actions.report">
+    <field name="binding_model_id" eval="False"/>
+</record> 
+
+<record id="sale.model_sale_order_send_mail" model="ir.actions.server">
+    <field name="binding_model_id" eval="False"/>
+</record>
+
+
+
+</odoo>
+       
+   
+
+

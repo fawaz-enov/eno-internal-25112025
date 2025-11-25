@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="paperformat_frcs_thermal_80" model="report.paperformat">
+    <field name="name">FRCS Thermal 80mm</field>
+    <field name="format">custom</field>
+    <field name="page_width">227</field>     <!-- 80 mm * 2.83465 ≈ 226.77 pt -->
+    <field name="page_height">0</field>      <!-- roll (infinite) -->
+    <field name="margin_top">2</field>
+    <field name="margin_bottom">2</field>
+    <field name="margin_left">0</field>      <!-- 0–2 pt for edge-to-edge -->
+    <field name="margin_right">0</field>
+    <field name="orientation">Portrait</field>
+    <field name="dpi">96</field>             <!-- safer default; see note below -->
+    <field name="header_line" eval="False"/>
+    <field name="header_spacing">0</field>
+  </record>
+</odoo>

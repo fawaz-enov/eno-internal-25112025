@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="utf-8"?>   
+<odoo>
+    <template id="report_copy_invoice_template">
+        <t t-call="web.external_layout">
+            <main style="padding-top:0px;">
+                <!-- Parse the JSON Data -->
+                <t t-set="data" t-value="docs.copy_post_response_json or {}"/>
+
+                <div style="position: absolute; right: 30px; top: 10px; text-align: right; font-weight: bold;">
+                    <h4 style="text-transform: uppercase; font-weight: 600;">TAX INVOICE</h4>
+                </div>
+                <br/>
+
+                <!-- Left: Customer Details -->
+                <table class="table table-borderless" style="width:100%; font-size: 12px; border-collapse: collapse; margin-bottom: 10px;">
+                    <tr>
+                        <td style="padding: 2px; width: 15%;"><strong>Customer Name:</strong></td>
+                        <td style="padding: 2px;">
+                            <t t-esc="docs.partner_id.name or ''"/><br/>
+                            <t t-esc="docs.partner_id.street or ''"/>
+                            <t t-if="docs.partner_id.street2">, <t t-esc="docs.partner_id.street2"/></t>
+                            <t t-if="docs.partner_id.city">, <t t-esc="docs.partner_id.city"/></t>
+                            <t t-if="docs.partner_id.state_id">, <t t-esc="docs.partner_id.state_id.name"/></t>
+                            <t t-if="docs.partner_id.zip">, <t t-esc="docs.partner_id.zip"/></t>
+                            <t t-if="docs.partner_id.country_id">, <t t-esc="docs.partner_id.country_id.name"/></t>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>Due Date:</strong></td>
+                        <td style="padding: 2px; ">
+                            <t t-if="docs.invoice_date_due">
+                                <t t-raw="docs.invoice_date_due.strftime('%d-%b-%Y')"/>
+                            </t>
+                            <t t-if="not docs.invoice_date_due">-</t>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>Document Date:</strong></td>
+                        <td style="padding: 2px; ">
+                            <t t-if="docs.invoice_date">
+                                <t t-raw="docs.invoice_date.strftime('%d-%b-%Y')"/>
+                            </t>
+                            <t t-if="not docs.invoice_date">-</t>
+                        </td>
+                    </tr>
+                </table>
+
+                <!-- Invoice Header -->
+                <p class="text-center" style="font-weight: bold;">
+                    ============================== THIS IS NOT A FISCAL RECEIPT ================================
+                </p>
+                
+
+
+                <!-- Left: Customer Details -->
+                <table class="table table-borderless" style="width:100%; font-size: 12px; border-collapse: collapse; margin-bottom: 10px;">
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>TIN:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="data.get('tin', '')"/></td>
+                        <td style="padding: 2px; width: 20%;"><strong>Company:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="data.get('businessName', '')"/></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>Store:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="data.get('businessName', '')"/></td>
+                        <td style="padding: 2px; width: 20%;"><strong>Address:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="data.get('address', '')"/></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>Cashier:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="docs.user_id.name or ''"/></td>
+                        <td style="padding: 2px; width: 20%;"><strong>Cashier TIN:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="docs.user_id.partner_id.vat or ''"/></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>District:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="data.get('district', '')"/></td>
+                        <td style="padding: 2px; width: 20%;"><strong>Buyer ID:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="docs.partner_id.id or ''"/></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>POS Number:</strong></td>
+                        <td style="padding: 2px; width: 30%;"><t t-esc="docs.name or ''"/></td>
+                        <td style="padding: 2px; width: 20%;"><strong>POS Time:</strong></td>
+                        <td style="padding: 2px; width: 30%;">
+                            <t t-set="s" t-value="data.get('sdcDateTime') or ''"/>
+                                <t t-if="s">
+                                    <t t-set="h" t-value="int(s[11:13])"/>
+                                    <t t-set="ampm" t-value="h >= 12 and 'PM' or 'AM'"/>
+                                    <t t-set="h12" t-value="(h % 12) or 12"/>
+                                    <t t-esc="s[0:10] + ' ' + ('%02d' % h12) + s[13:16] + ' ' + ampm"/>
+                                </t>
+                        </td>
+                    </tr>
+                    <t t-if="data.get('invoiceCounterExtension') in ['CS', 'CR']">
+                        <tr>
+                             <td style="padding: 2px; width: 20%;"><strong>Ref No:</strong></td>
+                             <td style="padding: 2px;"><t t-esc="docs.move_type == 'out_invoice' and docs.ref_doc_num or docs.move_type == 'out_refund' and docs.origin_doc_num or ''"/></td>
+                             <td style="padding: 2px; width: 20%;"><strong>Ref DT:</strong></td>
+                             <td style="padding: 2px; width: 30%;">
+                                 <t t-set="mvtype" t-value="docs.move_type or ''"/>
+                                 <t t-set="base_dt" t-value="(mvtype == 'out_invoice' and docs.ref_doc_date) or (mvtype == 'out_refund'  and docs.origin_doc_date) or False"/>
+                                 <!-- If present, format to 'YYYY-MM-DD hh:mm:ss AM/PM' in user tz -->
+                                 <t t-if="base_dt">
+                                    <t t-esc="(base_dt and base_dt.strftime('%Y-%m-%d %I:%M %p').upper()) or ''"/>
+                                 </t>
+                             </td>
+                        </tr>
+                    </t>
+                </table>
+
+                <div style="text-align: right; font-weight: 600;">
+                    <t t-if="data.get('invoiceCounterExtension') == 'CS'">
+                        <h4 style="font-weight: 500;">Copy Sale</h4>
+                    </t>
+                    <t t-if="data.get('invoiceCounterExtension') == 'CR'">
+                        <h4 style="font-weight: 500;">Copy Refund</h4>
+                    </t>
+                </div>
+                <div style="text-align:left; font-weight:normal;">Items</div>
+                <!-- Invoice Lines  -->
+                <table style="width:100%; border-collapse:collapse; collapse; border-spacing: 1px;border-spacing: 1px;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid black;font-size: 14px">
+                            <th style="text-align: left;font-weight: bold;padding: 2px; border:1px solid #000 !important;">Name</th>
+                            <th style="text-align: center;font-weight: bold;padding: 2px; border:1px solid #000 !important;">Qty</th>
+                            <th style="text-align: center;font-weight: bold;padding: 2px; border:1px solid #000 !important;">Price</th>
+                            <th style="text-align: right;font-weight: bold;padding: 2px; border:1px solid #000 !important;">Total</th>
+                        </tr>
+                    </thead>
+                    <!-- Decide if this invoice is a down-payment style: all invoice lines look like down payments -->
+                    <t t-set="is_downpayment_invoice"
+                       t-value="all([
+                         ('DOWN PAYMENT' in (l.name or '').upper()) or
+                         (l.sale_line_ids and any([sl.is_downpayment for sl in l.sale_line_ids]))
+                         for l in docs.invoice_line_ids
+                       ])"/>
+
+                    <!-- Resolve related Sale Orders (from linked sale_line_ids first; fallback to invoice_origin) -->
+                    <t t-set="sale_orders" t-value="docs.invoice_line_ids.mapped('sale_line_ids.order_id').exists()"/>
+                    <t t-set="so"
+                       t-value="(sale_orders and sale_orders) or
+                                (docs.invoice_origin and env['sale.order'].search([('name', '=', docs.invoice_origin)])) or []"/>
+
+                    <tbody style="font-size: 12px;">
+
+                        <!-- start -->
+                        <t t-if="is_downpayment_invoice and so">
+                            <!-- Loop over one or more SOs -->
+                            <t t-foreach="so" t-as="so_rec">
+                              <t t-foreach="so_rec.order_line" t-as="so_line">
+                                <t t-if="not so_line.display_type and ( 'is_downpayment' not in so_line._fields or not so_line.is_downpayment )">
+                                  <tr>
+                                    <td style="padding:2px; border:1px solid #000 !important;">
+                                      <t t-esc="(so_line.product_id and so_line.product_id.display_name) or so_line.name"/>
+                                      <t t-if="so_line.tax_id">(
+                                        <t t-esc="', '.join([(t.invoice_label or t.name) for t in so_line.tax_id])"/>
+                                      )</t>
+                                    </td>
+                                    <td style="text-align:center; padding:2px; border:1px solid #000 !important;">
+                                      <!-- choose what you want to show: ordered qty or delivered qty -->
+                                      <t t-esc="'{} {}'.format(int(so_line.product_uom_qty or 0), so_line.product_uom.name or '')"/>
+                                    </td>
+                                    <td style="text-align:center; padding:2px; border:1px solid #000 !important;">
+                                      <t t-esc="so_line.price_unit"/>
+                                    </td>
+                                    <td style="text-align:right; padding:2px; border:1px solid #000 !important;">
+                                      <t t-esc="'{:.2f}'.format((so_line.price_unit or 0.0) * (so_line.product_uom_qty or 0.0))"/>
+                                    </td>
+                                  </tr>
+                                </t>
+                              </t>
+                            </t>
+                          </t>
+                        <!-- end -->
+                        <t t-if="not (is_downpayment_invoice and so)">
+                        <t t-foreach="docs.invoice_line_ids" t-as="line">
+                            <tr>
+                                <td style="padding: 2px; border:1px solid #000 !important;"><t t-esc="line.product_id.name"/> (<t t-esc="line.tax_ids and ', '.join([str(t.invoice_label) for t in line.tax_ids]) or ''"/>)</td>
+                                <td style="text-align: center;padding: 2px; border:1px solid #000 !important;">
+                                    <t t-esc="'{} {}'.format(int(line.quantity or 0), line.product_uom_id.name or '')"/>
+                                </td>
+                                <td  style="text-align: center;padding: 2px; border:1px solid #000 !important;">
+                                    <t t-esc="line.price_unit"/>
+                                </td>
+                                <td style="text-align: right;padding: 2px; border:1px solid #000 !important;">
+                                    <t t-esc="'{:.2f}'.format(line.price_total or 0.0)"/>
+                                </td>
+                            </tr>
+                        </t>
+                        </t>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" style="text-align: right; font-weight: bold;font-size: 13px;padding: 2px; border:1px solid #000 !important;">
+                                <t t-if="data.get('invoiceCounterExtension') == 'CS'">Total Purchase</t>
+                                <t t-if="data.get('invoiceCounterExtension') == 'CR'">Total Refund</t>
+                            </td>
+                            <td style="text-align: right; font-weight: bold; border:1px solid #000 !important; font-size: 12px;padding: 2px;">
+                                <t t-esc="'{:.2f}'.format(docs.amount_total or 0.0)"/>
+                            </td>
+                        </tr>
+                        <t t-foreach="docs.matched_payment_ids" t-as="payment">
+                            <tr>
+                                <td colspan="3" style="text-align: right; font-weight: bold;font-size: 13px;padding: 2px; border:1px solid #000 !important;">
+                                    <t t-esc="(payment.journal_id.name or '').capitalize()"/>
+                                </td>
+                                <td colspan="3" style="text-align: right; font-weight: bold;font-size: 13px!important;padding: 2px; border:1px solid #000 !important;">
+                                    <t t-esc="'{:.2f}'.format(payment.amount or 0.0)"/>
+                                </td>
+                            </tr>
+                        </t>
+                    </tfoot>
+                </table>
+                <div  style="width: 100%; margin-top:10px;">
+                    <!-- Left: Tax Information -->
+                    <div style="float: left; width: 49%;">
+                        <table style="width: 100%; border-collapse: collapse; border: 1px solid black; font-size: 12px; border-spacing: 1px;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid black;">
+                                    <th style="text-align: left; padding: 2px; border:1px solid #000 !important;">Label</th>
+                                    <th style="text-align: left; padding: 2px; border:1px solid #000 !important;">Name</th>
+                                    <th style="text-align: right; padding: 2px; border:1px solid #000 !important;">Rate</th>
+                                    <th style="text-align: right; padding: 2px; border:1px solid #000 !important;">Tax</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <t t-set="total_tax" t-value="0"/>
+                                <t t-foreach="data.get('taxItems', [])" t-as="tax">
+                                    <tr>
+                                        <td style="padding: 2px; border:1px solid #000 !important;"><t t-esc="tax.get('label', '')"/></td>
+                                        <td style="padding: 2px; border:1px solid #000 !important;"><t t-esc="tax.get('categoryName', '')"/></td>
+                                        <td style="padding: 2px; border:1px solid #000 !important; text-align: right;">
+                                            <t t-esc="tax.get('rate', '0.00')"/>%
+                                        </td>
+                                        <td style="padding: 2px; border:1px solid #000 !important; text-align: right;">
+                                            <t t-esc="'{:.2f}'.format(tax.get('amount', '0'))"/>
+                                        </td>
+                                    </tr>
+                                    <t t-set="total_tax" t-value="total_tax + tax.get('amount', 0)"/>
+                                </t>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" style="padding: 2px; border:1px solid #000 !important;">Total Tax </td>
+                                    <td style="padding: 2px; border:1px solid #000 !important; text-align: right;">
+                                        <t t-esc="'{:.2f}'.format(total_tax or 0.0)"/>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between" style="display: flex; width: 100%;padding-top: 10px;page-break-inside: avoid;">
+                    <div style="width: 40%;">
+                        <t t-if="docs.qr_code">
+                            <img t-att-src="'data:image/png;base64,%s' % (docs.qr_code.decode('utf-8'))" style="width: 200px; height: 200px;"/>
+                        </t>
+                    </div>
+                    <div style="width: 60%;">
+                        <table class="table table-borderless" style="border-spacing: 0px;font-size: 13px;border-spacing: 1px;">
+                            <tr>
+                                <td><strong>SDC Time:</strong></td>
+                                <td>
+                                    <t t-set="s" t-value="data.get('sdcDateTime') or ''"/>
+                                    <t t-if="s">
+                                        <t t-set="h" t-value="int(s[11:13])"/>
+                                        <t t-set="ampm" t-value="h >= 12 and 'PM' or 'AM'"/>
+                                        <t t-set="h12" t-value="(h % 12) or 12"/>
+                                        <t t-esc="s[0:10] + ' ' + ('%02d' % h12) + s[13:16] + ':' + s[17:19] + ' ' + ampm"/>
+                                    </t>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>SDC Invoice No:</strong></td>
+                                <td><t t-esc="data.get('invoiceNumber', '')"/></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Invoice Counter:</strong></td>
+                                <td><t t-esc="data.get('invoiceCounter', '')"/></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                <br/>
+               <!-- clear floats, no forced new page -->
+                <div style="clear: both; text-align: center; width: 100%;">
+                  <span style="display:inline-block; white-space:nowrap; font-weight:bold; word-break:keep-all;">
+                    ============================== THIS IS NOT A FISCAL RECEIPT ================================
+                  </span>
+                </div>
+            </main>
+        </t>
+    </template>
+    <record id="action_print_copy_report" model="ir.actions.report">
+        <field name="name">Copy Report</field>
+        <field name="model">account.move</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">enovasions_account.report_copy_invoice_template</field>
+        <field name="report_file">enovasions_account.report_copy_invoice_template</field>
+        <field name="print_report_name">'Copy - %s' % (object.name)</field>
+        <field name="attachment"/>       
+    </record>
+
+</odoo>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>   
+  <odoo>  
+
+    <record id="view_partner_form_inherit" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <!-- Locate the VAT field and insert the new fields after it -->
+            <xpath expr="//field[@name='vat']" position="after">
+                <field name="cust_ref_num"  required="customer_rank != 0"  invisible="customer_rank == 0" />                           
+                <field name="partner_type"/>
+                <field name="charge_customer"/>
+            </xpath>
+            <xpath expr="//field[@name='property_payment_term_id']" position="attributes">
+                <attribute name="required">charge_customer == True</attribute>
+            </xpath>
+             <xpath expr="//field[@name='vat']" position="attributes">
+                    <attribute name="string">TIN</attribute>
+                    <attribute name="required">1</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_res_partner_search_inherit" model="ir.ui.view">
+        <field name="name">res.partner.search.inherit</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//group" position="inside">
+                <filter name="group_by_charge_customer" string="Charge Customer" domain="[]" context="{'group_by': 'charge_customer'}"/>
+            </xpath>
+        </field>
+    </record>
+
+
+</odoo>
+
+
