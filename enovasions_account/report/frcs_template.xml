@@ -12,6 +12,44 @@
                 </div>
                 <br/>
 
+                <t t-if="data.get('invoiceCounterExtension') in ['AS', 'AR']">
+                    <!-- Compute previous installment reference (QWeb) -->
+                    <t t-set="ref_no" t-value="''"/>
+                    <t t-set="ref_dt" t-value="''"/>
+
+                    <!-- Find related SO (first via invoice lines, then by origin) -->
+                    <t t-set="sale_orders" t-value="docs.invoice_line_ids.mapped('sale_line_ids.order_id').exists()"/>
+                    <t t-set="so"
+                    t-value="(sale_orders and sale_orders[0]) or
+                                (docs.invoice_origin and env['sale.order'].search([('name', '=', docs.invoice_origin)], limit=1))"/>
+
+                    <t t-if="so">
+                    <!-- All advance invoices for this SO, kept as a recordset (use recordset.sorted, not python sorted) -->
+                    <t t-set="adv_invoices"
+                        t-value="so.invoice_ids
+                                .filtered(lambda m: m.order_type == 'advance' and m.state != 'cancel')
+                                .sorted(key=lambda m: (m.invoice_date or m.create_date, m.id))"/>
+
+                    <!-- Build a Python list of IDs to safely use index(...) -->
+                    <t t-set="adv_ids" t-value="adv_invoices.ids"/>
+
+                    <!-- Current invoice index in the advances (default 0 to avoid None + int) -->
+                    <t t-set="idx" t-value="(adv_ids.index(docs.id) if docs.id in adv_ids else 0)"/>
+
+                    <!-- Previous advance invoice (if this is not the first) -->
+                    <t t-set="prev_inv" t-value="(idx > 0 and adv_invoices[idx-1]) or False"/>
+
+                    <!-- Read previous invoice's stored ref fields (with safe fallbacks) -->
+                    <t t-if="prev_inv">
+                        <t t-set="ref_no" t-value="prev_inv.ref_doc_num or ''"/>
+                        <t t-set="prev_dt_obj" t-value="prev_inv.ref_doc_date or prev_inv.invoice_date or prev_inv.create_date"/>
+                        <t t-if="prev_dt_obj">
+                        <t t-set="ref_dt" t-value="prev_dt_obj.strftime('%Y-%m-%d %H:%M:%S')"/>
+                        </t>
+                    </t>
+                    </t>
+                </t>
+
                 <!-- Left: Customer Details -->
                 <table class="table table-borderless" style="width:100%; font-size: 12px; border-collapse: collapse; margin-bottom: 10px;">
                     <tr>
@@ -98,7 +136,17 @@
                                  </t>
                         </td>
                     </tr>
-                    <t t-if="data.get('invoiceCounterExtension') in ['NR', 'AR', 'TR']">
+                    <t t-if="data.get('invoiceCounterExtension') in ['AS','AR'] and idx > 0">                     
+                        <tr>
+                            <td style="padding: 2px; width: 20%;"><strong>Ref No:</strong></td>
+                            <td style="padding: 2px;"><t t-esc="ref_no"/></td>
+                            <td style="padding: 2px; width: 20%;"><strong>Ref DT:</strong></td>
+                            <td style="padding: 2px; width: 30%;">
+                                <t t-if="ref_dt"><t t-esc="ref_dt"/></t>
+                            </td>
+                        </tr>
+                    </t>
+                    <t t-if="data.get('invoiceCounterExtension') in ['NR','TR']">
                         <tr>
                              <td style="padding: 2px; width: 20%;"><strong>Ref No:</strong></td>
                              <td style="padding: 2px;"><t t-esc="docs.move_type == 'out_invoice' and docs.ref_doc_num or docs.move_type == 'out_refund' and docs.origin_doc_num or ''"/></td>
@@ -106,13 +154,27 @@
                              <td style="padding: 2px; width: 30%;">
                                  <t t-set="mvtype" t-value="docs.move_type or ''"/>
                                  <t t-set="base_dt" t-value="(mvtype == 'out_invoice' and docs.ref_doc_date) or (mvtype == 'out_refund'  and docs.origin_doc_date) or False"/>
-                                 <!-- If present, format to 'YYYY-MM-DD hh:mm:ss AM/PM' in user tz -->
+                                 
                                  <t t-if="base_dt">
                                     <t t-esc="(base_dt and base_dt.strftime('%Y-%m-%d %I:%M %p').upper()) or ''"/>
                                  </t>
                              </td>
                         </tr>
                     </t>
+
+                    <!-- Render
+                    <tr>
+                        <td style="padding: 2px; width: 20%;"><strong>Ref No:</strong></td>
+                        <td style="padding: 2px;">
+                            <t t-esc="display_ref_no"/>
+                        </td>
+                        <td style="padding: 2px; width: 20%;"><strong>Ref DT:</strong></td>
+                        <td style="padding: 2px; width: 30%;">
+                            <t t-if="display_ref_dt">
+                                <t t-esc="display_ref_dt.strftime('%Y-%m-%d %I:%M %p').upper()"/>
+                            </t>
+                        </td>
+                    </tr> -->
                 </table>
 
                 <div style="text-align: right; font-weight: 600;">
@@ -147,7 +209,7 @@
                         </tr>
                     </thead>
                     <tbody style="font-size: 12px;">
-                            <t t-if="data.get('invoiceCounterExtension') in ('AS', 'AR')">
+                            <!-- <t t-if="data.get('invoiceCounterExtension') in ('AS', 'AR')">
                               <t t-set="sale_orders" t-value="docs.invoice_line_ids.mapped('sale_line_ids.order_id').exists()"/>
                               <t t-set="so" t-value="(sale_orders and sale_orders[0]) or (docs.invoice_origin and env['sale.order'].search([('name', '=', docs.invoice_origin)], limit=1))"/>
                               <t t-if="so">
@@ -170,25 +232,125 @@
                                   </t>
                                 </t>
                               </t>
+                            </t> -->
+                            <!-- <t t-else=""> -->
+                        <!-- ADVANCE / INSTALLMENT INVOICE LINES -->
+                        <t t-if="data.get('invoiceCounterExtension') in ('AS')">
+
+                            <!-- Find related SO -->
+                            <t t-set="sale_orders" t-value="docs.invoice_line_ids.mapped('sale_line_ids.order_id').exists()"/>
+                            <t t-set="so" t-value="(sale_orders and sale_orders[0]) or (docs.invoice_origin and env['sale.order'].search([('name','=',docs.invoice_origin)], limit=1))"/>
+
+                            <t t-if="so">
+
+                                <!-- Advance invoices recordset -->
+                                <t t-set="adv_invoices"
+                                t-value="so.invoice_ids
+                                            .filtered(lambda m: m.order_type == 'advance' and m.state != 'cancel')
+                                            .sorted(key=lambda m: (m.invoice_date or m.create_date, m.id))"/>
+
+                                <!-- Get index of current invoice -->
+                                <t t-set="adv_ids" t-value="adv_invoices.ids"/>
+                                <t t-set="idx" t-value="(adv_ids.index(docs.id) if docs.id in adv_ids else 0)"/>
+
+                                <!-- Installment number -->
+                                <t t-set="inst_no" t-value="idx + 1"/>
+                                <t t-set="inst_label"
+                                t-value="('%sth' % inst_no) if inst_no not in (1,2,3)
+                                            else ('1st' if inst_no==1 else ('2nd' if inst_no==2 else '3rd'))"/>
+
+                                <!-- Base product & tax label --> 
+                                <t t-set="base_line" t-value="so.order_line.filtered(lambda l: not l.display_type and ('is_downpayment' not in l._fields or not l.is_downpayment))[:1]"/>
+                                <t t-set="taxes" t-value="(base_line and base_line.tax_id) or env['account.tax'].browse([])"/>
+                                <t t-set="labels" t-value="taxes.mapped('invoice_label') or taxes.mapped('name')"/>
+                                <t t-set="tax_labels" t-value="', '.join([(lbl or '') for lbl in labels])"/>
+ 
+                                <!-- Installment Row -->
+                                <tr>
+                                    <td style="padding:2px; border:1px solid #000 !important;">
+                                        <t t-esc="inst_label"/> Installment
+                                        (<t t-esc="tax_labels"/>)
+                                    </td>
+
+                                    <td style="text-align:center; padding:2px; border:1px solid #000 !important;">1</td>
+
+                                    <td style="text-align:center; padding:2px; border:1px solid #000 !important;">
+                                        <t t-esc="'{:.2f}'.format(docs.amount_total or 0.0)"/>
+                                    </td>
+
+                                    <td style="text-align:right; padding:2px; border:1px solid #000 !important;">
+                                        <t t-esc="'{:.2f}'.format(docs.amount_total or 0.0)"/>
+                                    </td>
+                                </tr>
+
                             </t>
-                            <t t-else="">
-                            <t t-set="counter" t-value="1"/>
-                                <t t-foreach="docs.invoice_line_ids" t-as="line">
-                                    <tr>
-                                        <td style="padding: 2px; border:1px solid #000 !important;"><t t-esc="line.product_id.name"/> (<t t-esc="line.tax_ids and ', '.join([str(t.invoice_label) for t in line.tax_ids]) or ''"/>)</td>
-                                        <td style="text-align: center;padding: 2px; border:1px solid #000 !important;">
-                                            <t t-esc="'{} {}'.format(int(line.quantity or 0), line.product_uom_id.name or '')"/>
-                                        </td>
-                                        <td  style="text-align: center;padding: 2px; border:1px solid #000 !important;">
-                                            <t t-esc="line.price_unit"/>
-                                        </td>
-                                        <td style="text-align: right;padding: 2px; border:1px solid #000 !important;">
-                                            <t t-esc="'{:.2f}'.format(line.price_total or 0.0)"/>
-                                        </td>
-                                    </tr>
-                                    <t t-set="counter" t-value="counter + 1"/>
-                                </t>
+                        </t>
+                        <t t-elif="data.get('invoiceCounterExtension') == 'AR'">
+                            <!-- Get original reversed invoice -->
+                            <t t-set="orig" t-value="docs.reversed_entry_id"/>
+
+                            <!-- Find related SO from original invoice -->
+                            <t t-set="sale_orders" t-value="orig.invoice_line_ids.mapped('sale_line_ids.order_id').exists()"/>
+                            <t t-set="so" t-value="(sale_orders and sale_orders[0]) or (orig.invoice_origin and env['sale.order'].search([('name','=',orig.invoice_origin)], limit=1))"/>
+
+                            <!-- Compute original installment number -->
+                            <t t-if="so">
+                                <t t-set="adv_invoices"
+                                    t-value="so.invoice_ids
+                                                .filtered(lambda m: m.order_type == 'advance' and m.state != 'cancel')
+                                                .sorted(key=lambda m: (m.invoice_date or m.create_date, m.id))"/>
+
+                                <!-- Position of ORIGINAL invoice -->
+                                <t t-set="adv_ids" t-value="adv_invoices.ids"/>
+                                <t t-set="idx" t-value="(adv_ids.index(orig.id) if orig.id in adv_ids else 0)"/>
+
+                                <!-- Installment label -->
+                                <t t-set="inst_no" t-value="idx + 1"/>
+                                <t t-set="inst_label"
+                                    t-value="('%sth' % inst_no) if inst_no not in (1,2,3)
+                                            else ('1st' if inst_no==1 else ('2nd' if inst_no==2 else '3rd'))"/>
+
+                                <!-- TAX LABELS -->
+                                <t t-set="base_line" t-value="so.order_line.filtered(lambda l: not l.display_type and ('is_downpayment' not in l._fields or not l.is_downpayment))[:1]"/>
+                                <t t-set="taxes" t-value="(base_line and base_line.tax_id) or env['account.tax'].browse([])"/>
+                                <t t-set="labels" t-value="taxes.mapped('invoice_label') or taxes.mapped('name')"/>
+                                <t t-set="tax_labels" t-value="', '.join([(lbl or '') for lbl in labels])"/>
+
+                                <!-- Render AR line -->
+                                <tr>
+                                    <td style="padding:2px; border:1px solid #000 !important;">
+                                        <t t-esc="inst_label"/> Installment
+                                        (<t t-esc="tax_labels"/>)
+                                    </td>
+
+                                    <td style="text-align:center; padding:2px; border:1px solid #000 !important;">1</td>
+
+                                    <td style="text-align:center; padding:2px; border:1px solid #000 !important;">
+                                        <t t-esc="'{:.2f}'.format(docs.amount_total)"/>
+                                    </td>
+
+                                    <td style="text-align:right; padding:2px; border:1px solid #000 !important;">
+                                        <t t-esc="'{:.2f}'.format(docs.amount_total)"/>
+                                    </td>
+                                </tr>
                             </t>
+                        </t>
+                        <t t-else="">
+                            <t t-foreach="docs.invoice_line_ids" t-as="line">
+                                <tr>
+                                    <td style="padding: 2px; border:1px solid #000 !important;"><t t-esc="line.product_id.name"/> (<t t-esc="line.tax_ids and ', '.join([str(t.invoice_label) for t in line.tax_ids]) or ''"/>)</td>
+                                    <td style="text-align: center;padding: 2px; border:1px solid #000 !important;">
+                                        <t t-esc="'{} {}'.format(int(line.quantity or 0), line.product_uom_id.name or '')"/>
+                                    </td>
+                                    <td  style="text-align: center;padding: 2px; border:1px solid #000 !important;">
+                                        <t t-esc="line.price_unit"/>
+                                    </td>
+                                    <td style="text-align: right;padding: 2px; border:1px solid #000 !important;">
+                                        <t t-esc="'{:.2f}'.format(line.price_total or 0.0)"/>
+                                    </td>        
+                                </tr>    
+                            </t>  
+                        </t>          
                     </tbody>
                     <tfoot>
                         <tr>
