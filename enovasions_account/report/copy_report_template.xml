@@ -92,7 +92,7 @@
                                 </t>
                         </td>
                     </tr>
-                    <t t-if="data.get('invoiceCounterExtension') in ['CS', 'CR']">
+                    <!-- <t t-if="data.get('invoiceCounterExtension') in ['CS', 'CR']">
                         <tr>
                              <td style="padding: 2px; width: 20%;"><strong>Ref No:</strong></td>
                              <td style="padding: 2px;"><t t-esc="docs.move_type == 'out_invoice' and docs.ref_doc_num or docs.move_type == 'out_refund' and docs.origin_doc_num or ''"/></td>
@@ -100,13 +100,36 @@
                              <td style="padding: 2px; width: 30%;">
                                  <t t-set="mvtype" t-value="docs.move_type or ''"/>
                                  <t t-set="base_dt" t-value="(mvtype == 'out_invoice' and docs.ref_doc_date) or (mvtype == 'out_refund'  and docs.origin_doc_date) or False"/>
-                                 <!-- If present, format to 'YYYY-MM-DD hh:mm:ss AM/PM' in user tz -->
-                                 <t t-if="base_dt">
+                                  <t t-if="base_dt">
                                     <t t-esc="(base_dt and base_dt.strftime('%Y-%m-%d %I:%M %p').upper()) or ''"/>
                                  </t>
                              </td>
                         </tr>
-                    </t>
+                    </t> -->
+                    <t t-if="data.get('invoiceCounterExtension') in ['CS','CR']">
+                        <tr>
+                            <td style="padding: 2px; width: 20%;"><strong>Ref No:</strong></td>
+                            <td style="padding: 2px;">
+                            <t t-if="data.get('invoiceCounterExtension') == 'CR' and docs.reversed_entry_id and docs.reversed_entry_id.order_type == 'advance'">
+                                <t t-esc="docs.ref_doc_num or ''"/>
+                            </t>
+                            <t t-else="">
+                                <t t-esc="docs.move_type == 'out_invoice' and (docs.ref_doc_num or '') or (docs.origin_doc_num or '')"/>
+                            </t>
+                            </td>
+                            <td style="padding: 2px; width: 20%;"><strong>Ref DT:</strong></td>
+                            <td style="padding: 2px; width: 30%;">
+                            <t t-if="data.get('invoiceCounterExtension') == 'CR' and docs.reversed_entry_id and docs.reversed_entry_id.order_type == 'advance'">
+                                <t t-esc="docs.ref_doc_date and docs.ref_doc_date.strftime('%Y-%m-%d %I:%M %p').upper() or ''"/>
+                            </t>
+                            <t t-else="">
+                                <t t-esc="(docs.move_type == 'out_invoice' and docs.ref_doc_date or docs.origin_doc_date) and
+                                        (docs.move_type == 'out_invoice' and docs.ref_doc_date or docs.origin_doc_date).strftime('%Y-%m-%d %I:%M %p').upper() or ''"/>
+                            </t>
+                            </td>
+                        </tr>
+                        </t>
+
                 </table>
 
                 <div style="text-align: right; font-weight: 600;">
@@ -143,52 +166,114 @@
                                 (docs.invoice_origin and env['sale.order'].search([('name', '=', docs.invoice_origin)])) or []"/>
 
                     <tbody style="font-size: 12px;">
+                            <!-- Flag: Copy Refund of an Advance Refund -->
+                            <t t-set="is_cr_of_ar"
+                                t-value="data.get('invoiceCounterExtension') == 'CR'
+                                        and docs.reversed_entry_id
+                                        and docs.reversed_entry_id.order_type == 'advance'"/>
 
-                        <!-- start -->
-                        <t t-if="is_downpayment_invoice and so">
-                            <!-- Loop over one or more SOs -->
-                            <t t-foreach="so" t-as="so_rec">
-                              <t t-foreach="so_rec.order_line" t-as="so_line">
-                                <t t-if="not so_line.display_type and ( 'is_downpayment' not in so_line._fields or not so_line.is_downpayment )">
-                                  <tr>
+                            <!-- Decide if the current move looks like a down-payment style (for CS etc.) -->
+                            <t t-set="is_downpayment_invoice"
+                                t-value="all([
+                                ('DOWN PAYMENT' in (l.name or '').upper()) or
+                                (l.sale_line_ids and any([sl.is_downpayment for sl in l.sale_line_ids]))
+                                for l in docs.invoice_line_ids
+                                ])"/>
+
+                            <!-- Resolve related SOs as before -->
+                            <t t-set="sale_orders" t-value="docs.invoice_line_ids.mapped('sale_line_ids.order_id').exists()"/>
+                            <t t-set="so"
+                                t-value="(sale_orders and sale_orders) or
+                                        (docs.invoice_origin and env['sale.order'].search([('name', '=', docs.invoice_origin)])) or []"/>
+
+                            <!-- 1) CR of AR: render the original installment (force this branch first) -->
+                            <t t-if="is_cr_of_ar">
+                                <t t-set="orig" t-value="docs.reversed_entry_id"/>
+                                <t t-set="sale_orders_orig" t-value="orig.invoice_line_ids.mapped('sale_line_ids.order_id').exists()"/>
+                                <t t-set="so_orig" t-value="sale_orders_orig and sale_orders_orig[0] or False"/>
+
+                                <t t-if="so_orig">
+                                <!-- compute original installment number -->
+                                <t t-set="adv_invoices"
+                                    t-value="so_orig.invoice_ids
+                                                .filtered(lambda m: m.order_type == 'advance' and m.state != 'cancel')
+                                                .sorted(key=lambda m: (m.invoice_date or m.create_date, m.id))"/>
+                                <t t-set="adv_ids" t-value="adv_invoices.ids"/>
+                                <t t-set="idx" t-value="(adv_ids.index(orig.id) if orig.id in adv_ids else 0)"/>
+                                <t t-set="inst_no" t-value="idx + 1"/>
+                                <t t-set="inst_label"
+                                    t-value="('%sth' % inst_no) if inst_no not in (1,2,3)
+                                            else ('1st' if inst_no==1 else ('2nd' if inst_no==2 else '3rd'))"/>
+
+                                <!-- tax label from base SO line -->
+                                <t t-set="base_line"
+                                    t-value="so_orig.order_line.filtered(lambda l: not l.display_type and ('is_downpayment' not in l._fields or not l.is_downpayment))[:1]"/>
+                                <t t-set="labels" t-value="base_line.tax_id.mapped('invoice_label') or base_line.tax_id.mapped('name')"/>
+                                <t t-set="tax_labels" t-value="', '.join(labels)"/>
+
+                                <!-- single line reflecting the original AR installment -->
+                                <tr>
                                     <td style="padding:2px; border:1px solid #000 !important;">
-                                      <t t-esc="(so_line.product_id and so_line.product_id.display_name) or so_line.name"/>
-                                      <t t-if="so_line.tax_id">(
-                                        <t t-esc="', '.join([(t.invoice_label or t.name) for t in so_line.tax_id])"/>
-                                      )</t>
+                                    <t t-esc="inst_label"/> Installment (<t t-esc="tax_labels"/>)
                                     </td>
+                                    <td style="text-align:center; padding:2px; border:1px solid #000 !important;">1</td>
                                     <td style="text-align:center; padding:2px; border:1px solid #000 !important;">
-                                      <!-- choose what you want to show: ordered qty or delivered qty -->
-                                      <t t-esc="'{} {}'.format(int(so_line.product_uom_qty or 0), so_line.product_uom.name or '')"/>
-                                    </td>
-                                    <td style="text-align:center; padding:2px; border:1px solid #000 !important;">
-                                      <t t-esc="so_line.price_unit"/>
+                                    <t t-esc="'{:.2f}'.format(orig.amount_total or 0.0)"/>
                                     </td>
                                     <td style="text-align:right; padding:2px; border:1px solid #000 !important;">
-                                      <t t-esc="'{:.2f}'.format((so_line.price_unit or 0.0) * (so_line.product_uom_qty or 0.0))"/>
+                                    <t t-esc="'{:.2f}'.format(orig.amount_total or 0.0)"/>
                                     </td>
-                                  </tr>
+                                </tr>
                                 </t>
-                              </t>
                             </t>
-                          </t>
-                        <!-- end -->
-                        <t t-if="not (is_downpayment_invoice and so)">
-                        <t t-foreach="docs.invoice_line_ids" t-as="line">
-                            <tr>
-                                <td style="padding: 2px; border:1px solid #000 !important;"><t t-esc="line.product_id.name"/> (<t t-esc="line.tax_ids and ', '.join([str(t.invoice_label) for t in line.tax_ids]) or ''"/>)</td>
-                                <td style="text-align: center;padding: 2px; border:1px solid #000 !important;">
-                                    <t t-esc="'{} {}'.format(int(line.quantity or 0), line.product_uom_id.name or '')"/>
-                                </td>
-                                <td  style="text-align: center;padding: 2px; border:1px solid #000 !important;">
-                                    <t t-esc="line.price_unit"/>
-                                </td>
-                                <td style="text-align: right;padding: 2px; border:1px solid #000 !important;">
-                                    <t t-esc="'{:.2f}'.format(line.price_total or 0.0)"/>
-                                </td>
-                            </tr>
-                        </t>
-                        </t>
+
+                            <!-- 2) Else: down-payment style copy sale/refund (CS/CR not tied to AR) -->
+                            <t t-else="">
+                                <t t-if="is_downpayment_invoice and so">
+                                <t t-foreach="so" t-as="so_rec">
+                                    <t t-foreach="so_rec.order_line" t-as="so_line">
+                                    <t t-if="not so_line.display_type and ( 'is_downpayment' not in so_line._fields or not so_line.is_downpayment )">
+                                        <tr>
+                                        <td style="padding:2px; border:1px solid #000 !important;">
+                                            <t t-esc="(so_line.product_id and so_line.product_id.display_name) or so_line.name"/>
+                                            <t t-if="so_line.tax_id">(<t t-esc="', '.join([(t.invoice_label or t.name) for t in so_line.tax_id])"/>)</t>
+                                        </td>
+                                        <td style="text-align:center; padding:2px; border:1px solid #000 !important;">
+                                            <t t-esc="'{} {}'.format(int(so_line.product_uom_qty or 0), so_line.product_uom.name or '')"/>
+                                        </td>
+                                        <td style="text-align:center; padding:2px; border:1px solid #000 !important;">
+                                            <t t-esc="so_line.price_unit"/>
+                                        </td>
+                                        <td style="text-align:right; padding:2px; border:1px solid #000 !important;">
+                                            <t t-esc="'{:.2f}'.format((so_line.price_unit or 0.0) * (so_line.product_uom_qty or 0.0))"/>
+                                        </td>
+                                        </tr>
+                                    </t>
+                                    </t>
+                                </t>
+                                </t>
+
+                                <!-- 3) Fallback: list invoice lines -->
+                                <t t-else="">
+                                <t t-foreach="docs.invoice_line_ids" t-as="line">
+                                    <tr>
+                                    <td style="padding: 2px; border:1px solid #000 !important;">
+                                        <t t-esc="line.product_id.name or line.name"/> (<t t-esc="line.tax_ids and ', '.join([str(t.invoice_label) for t in line.tax_ids]) or ''"/>)
+                                    </td>
+                                    <td style="text-align: center;padding: 2px; border:1px solid #000 !important;">
+                                        <t t-esc="'{} {}'.format(int(line.quantity or 0), line.product_uom_id.name or '')"/>
+                                    </td>
+                                    <td style="text-align: center;padding: 2px; border:1px solid #000 !important;">
+                                        <t t-esc="line.price_unit"/>
+                                    </td>
+                                    <td style="text-align: right;padding: 2px; border:1px solid #000 !important;">
+                                        <t t-esc="'{:.2f}'.format(line.price_total or 0.0)"/>
+                                    </td>
+                                    </tr>
+                                </t>
+                                </t>
+
+                            </t>
                     </tbody>
                     <tfoot>
                         <tr>
