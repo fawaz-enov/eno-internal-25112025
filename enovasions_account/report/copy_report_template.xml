@@ -80,7 +80,7 @@
                     </tr>
                     <tr>
                         <td style="padding: 2px; width: 20%;"><strong>POS Number:</strong></td>
-                        <td style="padding: 2px; width: 30%;"><t t-esc="docs.name or ''"/></td>
+                        <td style="padding: 2px; width: 30%;">32/2.01</td>
                         <td style="padding: 2px; width: 20%;"><strong>POS Time:</strong></td>
                         <td style="padding: 2px; width: 30%;">
                             <t t-set="s" t-value="data.get('sdcDateTime') or ''"/>
