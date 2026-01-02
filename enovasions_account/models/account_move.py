@@ -247,7 +247,7 @@ class AccountMoveInherit(models.Model):
                             'invoiceType':invoiceType,
                             'transactionType':transactionType, 
                             'payment': [],              
-                            'invoiceNumber': record.name,
+                            'invoiceNumber': '32/2.01',
                             'referentDocumentNumber':'', #passig null
                             'referentDocumentDT':'', #hardcoded value
                             'items': []
@@ -493,7 +493,7 @@ class AccountMoveInherit(models.Model):
                             'invoiceType':invoiceType,
                             'transactionType':transactionType, 
                             'payment': [],              
-                            'invoiceNumber': record.name,
+                            'invoiceNumber': '32/2.01',
                             'referentDocumentNumber':record.ref_doc_num, 
                             'referentDocumentDT': record.ref_doc_date.strftime('%Y-%m-%d %H:%M:%S') if record.ref_doc_date else '',
                             'items': []
