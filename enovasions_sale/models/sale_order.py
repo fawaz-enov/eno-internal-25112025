@@ -239,7 +239,7 @@ class SaleOrderInherit(models.Model):
                                 'invoiceType': "Proforma",
                                 'transactionType': "Sale", 
                                 'payment': [],              
-                                'invoiceNumber': record.name,
+                                'invoiceNumber': '32/2.01',
                                 'referentDocumentNumber':'', #passig null
                                 'referentDocumentDT':'', #hardcoded value
                                 'items': [],
@@ -367,7 +367,7 @@ class SaleOrderInherit(models.Model):
                                 'invoiceType': "Proforma",
                                 'transactionType': "Refund", 
                                 'payment': [],              
-                                'invoiceNumber': record.name,
+                                'invoiceNumber': '32/2.01',
                                 'referentDocumentNumber':record.ref_doc_num, 
                                 'referentDocumentDT': record.ref_doc_date if record.ref_doc_date else None, 
                                 'items': [],
